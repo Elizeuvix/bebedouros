@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'config_screen.dart';
+import 'internet_helper.dart';
 
 class Coxo {
   final String coxoId;
@@ -77,7 +79,32 @@ class _CoxosPageState extends State<CoxosPage> {
       _httpMessage = null;
     });
     try {
-      final response = await http.get(Uri.parse('http://192.168.3.196/coxos/read_manutecao.php'));
+      // Lê host salvo em host.json
+      final directory = await getApplicationDocumentsDirectory();
+      final hostFile = File('${directory.path}/host.json');
+      String hostUrl = '';
+      if (await hostFile.exists()) {
+        final hostContent = await hostFile.readAsString();
+        final hostJson = jsonDecode(hostContent);
+        hostUrl = hostJson['host'] ?? '';
+      }
+      if (hostUrl.isEmpty) {
+        setState(() {
+          _httpMessage = 'Host não configurado.';
+        });
+        // Abre a tela de configuração
+        Future.delayed(Duration.zero, () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ConfigScreen()),
+          );
+        });
+        return;
+      }
+      final fullUrl = hostUrl.endsWith('/')
+        ? '${hostUrl}read_manutencao.php'
+        : '$hostUrl/read_manutencao.php';
+      final response = await http.get(Uri.parse(fullUrl));
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
         final List<Map<String, dynamic>> coxosToSave = [];
@@ -144,7 +171,7 @@ class _CoxosPageState extends State<CoxosPage> {
                 ),
                 TextFormField(
                   controller: dataController,
-                  decoration: const InputDecoration(labelText: 'Data (yyyy-MM-dd)'),
+                  decoration: const InputDecoration(labelText: 'Data (dd/MM/yyyy)'),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Informe a data';
                     try {
@@ -201,10 +228,16 @@ class _CoxosPageState extends State<CoxosPage> {
       appBar: AppBar(
         title: const Text('Coxos'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.cloud_download),
-            tooltip: 'Load Coxos',
-            onPressed: _loadingHttp ? null : _loadCoxosFromWeb,
+          FutureBuilder<bool>(
+            future: checkInternet(),
+            builder: (context, snapshot) {
+              final isOnline = snapshot.data ?? false;
+              return IconButton(
+                icon: const Icon(Icons.cloud_download),
+                tooltip: isOnline ? 'Load Coxos' : 'Sem conexão',
+                onPressed: (_loadingHttp || !isOnline) ? null : _loadCoxosFromWeb,
+              );
+            },
           ),
         ],
       ),
