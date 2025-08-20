@@ -18,7 +18,9 @@ Future<void> _ensureHostFile() async {
   final directory = await getApplicationDocumentsDirectory();
   final hostFile = File('${directory.path}/host.json');
   if (!await hostFile.exists()) {
-    await hostFile.writeAsString(jsonEncode({'host': 'http://192.168.3.196/coxos/'}));
+    await hostFile.writeAsString(
+      jsonEncode({'host': 'http://192.168.3.196/coxos/'}),
+    );
   }
 }
 
@@ -38,7 +40,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-
 class UserIdentificationPage extends StatefulWidget {
   const UserIdentificationPage({Key? key}) : super(key: key);
 
@@ -47,6 +48,7 @@ class UserIdentificationPage extends StatefulWidget {
 }
 
 class _UserIdentificationPageState extends State<UserIdentificationPage> {
+  String? _lastSyncUrl;
   bool _syncAvailable = false;
   bool _syncing = false;
   String? _syncMessage;
@@ -60,20 +62,22 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
 
   Future<void> _checkSyncAvailable() async {
     final hasInternet = await checkInternet();
-    final directory = await getApplicationDocumentsDirectory();
-    final coxosFile = File('${directory.path}/coxos.json');
-    bool hasChanges = false;
-    if (await coxosFile.exists()) {
-      final lastModified = await coxosFile.lastModified();
-      // Simples: considera que se o arquivo foi modificado nos últimos 5 minutos, há alteração
-      hasChanges = DateTime.now().difference(lastModified).inMinutes < 5;
-    }
     setState(() {
-      _syncAvailable = hasInternet && hasChanges;
+      _syncAvailable = hasInternet;
     });
   }
 
   Future<void> _syncCoxos() async {
+    final directory = await getApplicationDocumentsDirectory();
+    // Lê nome do usuário salvo em user.json
+    String usuarioNome = '';
+    final userFile = File('${directory.path}/user.json');
+    if (await userFile.exists()) {
+      final userContent = await userFile.readAsString();
+      final userJson = jsonDecode(userContent);
+      usuarioNome = userJson['nome'] ?? '';
+    }
+  // ...existing code...
     setState(() {
       _syncing = true;
       _syncMessage = null;
@@ -85,7 +89,7 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
       if (await hostFile.exists()) {
         final hostContent = await hostFile.readAsString();
         final hostJson = jsonDecode(hostContent);
-        hostUrl = hostJson['host'] ?? '';
+        hostUrl = hostJson['host_url'] ?? '';
       }
       if (hostUrl.isEmpty) {
         setState(() {
@@ -94,6 +98,8 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
         return;
       }
       final coxosFile = File('${directory.path}/coxos.json');
+      print(coxosFile);
+      
       if (!await coxosFile.exists()) {
         setState(() {
           _syncMessage = 'Arquivo coxos.json não encontrado.';
@@ -103,17 +109,20 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
       final coxosData = await coxosFile.readAsString();
       final List<dynamic> coxosList = jsonDecode(coxosData);
       final fullUrl = hostUrl.endsWith('/')
-        ? '${hostUrl}insert_manutencao.php'
-        : '$hostUrl/insert_manutencao.php';
-      int successCount = 0;
-      int failCount = 0;
+          ? '${hostUrl}insert_manutencao.php'
+          : '$hostUrl/insert_manutencao.php';
+    setState(() {
+      _lastSyncUrl = fullUrl;
+    });
+  int successCount = 0;
+  int failCount = 0;
       for (var item in coxosList) {
         final response = await http.post(
           Uri.parse(fullUrl),
           body: {
             'coxo_idPost': item['coxo_id'] ?? '',
             'data_manutPost': item['coxo_data'] ?? '',
-            'usuarioPost': item['usuario'] ?? '',
+            'usuarioPost': usuarioNome,
           },
         );
         if (response.statusCode == 200) {
@@ -128,7 +137,8 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
         }
       }
       setState(() {
-        _syncMessage = 'Sincronização concluída: $successCount enviados, $failCount falharam.';
+        _syncMessage =
+            'Sincronização concluída: $successCount enviados, $failCount falharam.';
       });
     } catch (e) {
       setState(() {
@@ -141,6 +151,7 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
       _checkSyncAvailable();
     }
   }
+
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _roleController = TextEditingController();
   String? _message;
@@ -217,7 +228,7 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
             if (_message != null) ...[
               const SizedBox(height: 16),
               Text(_message!, style: const TextStyle(color: Colors.green)),
-            ]
+            ],
           ],
         ),
       ),
@@ -226,6 +237,14 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_lastSyncUrl != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Text(
+                  'URL de sincronização: \n$_lastSyncUrl',
+                  style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+                ),
+              ),
             ElevatedButton.icon(
               icon: const Icon(Icons.sync),
               label: const Text('Sincronizar Dados'),
@@ -242,7 +261,10 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
             if (_syncMessage != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
-                child: Text(_syncMessage!, style: const TextStyle(color: Colors.green)),
+                child: Text(
+                  _syncMessage!,
+                  style: const TextStyle(color: Colors.green),
+                ),
               ),
             ElevatedButton.icon(
               icon: const Icon(Icons.settings),

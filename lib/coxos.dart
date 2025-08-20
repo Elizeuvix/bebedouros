@@ -30,6 +30,7 @@ class CoxosPage extends StatefulWidget {
 }
 
 class _CoxosPageState extends State<CoxosPage> {
+  String? _lastSyncUrl;
   bool _syncAvailable = false;
   bool _syncing = false;
   String? _syncMessage;
@@ -43,19 +44,22 @@ class _CoxosPageState extends State<CoxosPage> {
 
   Future<void> _checkSyncAvailable() async {
     final hasInternet = await checkInternet();
-    final path = await _getFilePath();
-    final file = File(path);
-    bool hasChanges = false;
-    if (await file.exists()) {
-      final lastModified = await file.lastModified();
-      hasChanges = DateTime.now().difference(lastModified).inMinutes < 5;
-    }
     setState(() {
-      _syncAvailable = hasInternet && hasChanges;
+      _syncAvailable = hasInternet;
     });
   }
 
   Future<void> _syncCoxos() async {
+    // ...existing code...
+    final directory = await getApplicationDocumentsDirectory();
+    // Lê nome do usuário salvo em user.json
+    String usuarioNome = '';
+    final userFile = File('${directory.path}/user.json');
+    if (await userFile.exists()) {
+      final userContent = await userFile.readAsString();
+      final userJson = jsonDecode(userContent);
+      usuarioNome = userJson['nome'] ?? '';
+    }
     setState(() {
       _syncing = true;
       _syncMessage = null;
@@ -67,7 +71,9 @@ class _CoxosPageState extends State<CoxosPage> {
       if (await hostFile.exists()) {
         final hostContent = await hostFile.readAsString();
         final hostJson = jsonDecode(hostContent);
-        hostUrl = hostJson['host'] ?? '';
+        hostUrl = hostJson['host_url'] ?? '';
+
+        print('DEBUG HOST URL: $hostUrl');
       }
       if (hostUrl.isEmpty) {
         setState(() {
@@ -85,8 +91,11 @@ class _CoxosPageState extends State<CoxosPage> {
       final coxosData = await coxosFile.readAsString();
       final List<dynamic> coxosList = jsonDecode(coxosData);
       final fullUrl = hostUrl.endsWith('/')
-        ? '${hostUrl}insert_manutencao.php'
-        : '$hostUrl/insert_manutencao.php';
+          ? '${hostUrl}insert_manutencao.php'
+          : '$hostUrl/insert_manutencao.php';
+
+      print('DEBUG URL de sincronização: $fullUrl');
+
       int successCount = 0;
       int failCount = 0;
       for (var item in coxosList) {
@@ -95,11 +104,14 @@ class _CoxosPageState extends State<CoxosPage> {
           body: {
             'coxo_idPost': item['coxo_id'] ?? '',
             'data_manutPost': item['coxo_data'] ?? '',
-            'usuarioPost': item['usuario'] ?? '',
+            'usuarioPost': usuarioNome,
           },
         );
         if (response.statusCode == 200) {
           final respJson = jsonDecode(response.body);
+          setState(() {
+            _lastSyncUrl = fullUrl;
+          });
           if (respJson['success'] == true) {
             successCount++;
           } else {
@@ -110,7 +122,8 @@ class _CoxosPageState extends State<CoxosPage> {
         }
       }
       setState(() {
-        _syncMessage = 'Sincronização concluída: $successCount enviados, $failCount falharam.';
+        _syncMessage =
+            'Sincronização concluída: $successCount enviados, $failCount falharam.';
       });
     } catch (e) {
       setState(() {
@@ -123,6 +136,7 @@ class _CoxosPageState extends State<CoxosPage> {
       _checkSyncAvailable();
     }
   }
+
   List<Coxo> _coxos = [];
   bool _loading = true;
   bool _loadingHttp = false;
@@ -158,11 +172,15 @@ class _CoxosPageState extends State<CoxosPage> {
   Future<void> _saveCoxos() async {
     final path = await _getFilePath();
     final file = File(path);
-    final list = _coxos.map((c) => {
-      'coxo_id': c.coxoId,
-      'coxo_data': c.coxoData,
-      'next_data': c.nextData,
-    }).toList();
+    final list = _coxos
+        .map(
+          (c) => {
+            'coxo_id': c.coxoId,
+            'coxo_data': c.coxoData,
+            'next_data': c.nextData,
+          },
+        )
+        .toList();
     await file.writeAsString(jsonEncode(list));
   }
 
@@ -179,7 +197,7 @@ class _CoxosPageState extends State<CoxosPage> {
       if (await hostFile.exists()) {
         final hostContent = await hostFile.readAsString();
         final hostJson = jsonDecode(hostContent);
-        hostUrl = hostJson['host'] ?? '';
+        hostUrl = hostJson['host_url'] ?? '';
       }
       if (hostUrl.isEmpty) {
         setState(() {
@@ -195,8 +213,8 @@ class _CoxosPageState extends State<CoxosPage> {
         return;
       }
       final fullUrl = hostUrl.endsWith('/')
-        ? '${hostUrl}read_manutencao.php'
-        : '$hostUrl/read_manutencao.php';
+          ? '${hostUrl}read_manutencao.php'
+          : '$hostUrl/read_manutencao.php';
       final response = await http.get(Uri.parse(fullUrl));
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -212,7 +230,10 @@ class _CoxosPageState extends State<CoxosPage> {
           }
           String nextData = '';
           if (data != null) {
-            nextData = data.add(const Duration(days: 7)).toIso8601String().split('T')[0];
+            nextData = data
+                .add(const Duration(days: 7))
+                .toIso8601String()
+                .split('T')[0];
           }
           coxosToSave.add({
             'coxo_id': coxoId,
@@ -260,11 +281,14 @@ class _CoxosPageState extends State<CoxosPage> {
                 TextFormField(
                   controller: idController,
                   decoration: const InputDecoration(labelText: 'Coxo ID'),
-                  validator: (v) => v == null || v.isEmpty ? 'Informe o ID' : null,
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Informe o ID' : null,
                 ),
                 TextFormField(
                   controller: dataController,
-                  decoration: const InputDecoration(labelText: 'Data (dd/MM/yyyy)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Data (dd/MM/yyyy)',
+                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Informe a data';
                     try {
@@ -288,8 +312,15 @@ class _CoxosPageState extends State<CoxosPage> {
                 if (formKey.currentState?.validate() ?? false) {
                   final coxoId = idController.text.trim();
                   final coxoData = dataController.text.trim();
-                  final nextData = DateTime.parse(coxoData).add(const Duration(days: 7)).toIso8601String().split('T')[0];
-                  final newCoxo = Coxo(coxoId: coxoId, coxoData: coxoData, nextData: nextData);
+                  final nextData = DateTime.parse(coxoData)
+                      .add(const Duration(days: 7))
+                      .toIso8601String()
+                      .split('T')[0];
+                  final newCoxo = Coxo(
+                    coxoId: coxoId,
+                    coxoData: coxoData,
+                    nextData: nextData,
+                  );
                   setState(() {
                     if (index != null) {
                       _coxos[index] = newCoxo;
@@ -322,7 +353,9 @@ class _CoxosPageState extends State<CoxosPage> {
               return IconButton(
                 icon: const Icon(Icons.cloud_download),
                 tooltip: isOnline ? 'Load Coxos' : 'Sem conexão',
-                onPressed: (_loadingHttp || !isOnline) ? null : _loadCoxosFromWeb,
+                onPressed: (_loadingHttp || !isOnline)
+                    ? null
+                    : _loadCoxosFromWeb,
               );
             },
           ),
@@ -330,12 +363,14 @@ class _CoxosPageState extends State<CoxosPage> {
       ),
       body: Column(
         children: [
-          if (_loadingHttp)
-            const LinearProgressIndicator(),
+          if (_loadingHttp) const LinearProgressIndicator(),
           if (_httpMessage != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text(_httpMessage!, style: const TextStyle(color: Colors.green)),
+              child: Text(
+                _httpMessage!,
+                style: const TextStyle(color: Colors.green),
+              ),
             ),
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -356,37 +391,44 @@ class _CoxosPageState extends State<CoxosPage> {
           if (_syncMessage != null)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
-              child: Text(_syncMessage!, style: const TextStyle(color: Colors.green)),
+              child: Text(
+                _syncMessage!,
+                style: const TextStyle(color: Colors.green),
+              ),
             ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _coxos.isEmpty
-                    ? const Center(child: Text('Nenhum registro encontrado.'))
-                    : ListView.builder(
-                        itemCount: _coxos.length,
-                        itemBuilder: (context, index) {
-                          final coxo = _coxos[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: ListTile(
-                              title: Text('ID: ${coxo.coxoId}'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Data: ${coxo.coxoData}'),
-                                  Text('Próxima Data: ${coxo.nextData}'),
-                                ],
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.edit),
-                                tooltip: 'Editar',
-                                onPressed: () => _addOrEditCoxo(coxo: coxo, index: index),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                ? const Center(child: Text('Nenhum registro encontrado.'))
+                : ListView.builder(
+                    itemCount: _coxos.length,
+                    itemBuilder: (context, index) {
+                      final coxo = _coxos[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: ListTile(
+                          title: Text('ID: ${coxo.coxoId}'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Data: ${coxo.coxoData}'),
+                              Text('Próxima Data: ${coxo.nextData}'),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit),
+                            tooltip: 'Editar',
+                            onPressed: () =>
+                                _addOrEditCoxo(coxo: coxo, index: index),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
