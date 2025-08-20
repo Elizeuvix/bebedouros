@@ -101,23 +101,35 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
         return;
       }
       final coxosData = await coxosFile.readAsString();
+      final List<dynamic> coxosList = jsonDecode(coxosData);
       final fullUrl = hostUrl.endsWith('/')
         ? '${hostUrl}insert_manutencao.php'
         : '$hostUrl/insert_manutencao.php';
-      final response = await http.post(
-        Uri.parse(fullUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: coxosData,
-      );
-      if (response.statusCode == 200) {
-        setState(() {
-          _syncMessage = 'Dados sincronizados com sucesso!';
-        });
-      } else {
-        setState(() {
-          _syncMessage = 'Erro ao sincronizar (${response.statusCode})';
-        });
+      int successCount = 0;
+      int failCount = 0;
+      for (var item in coxosList) {
+        final response = await http.post(
+          Uri.parse(fullUrl),
+          body: {
+            'coxo_idPost': item['coxo_id'] ?? '',
+            'data_manutPost': item['coxo_data'] ?? '',
+            'usuarioPost': item['usuario'] ?? '',
+          },
+        );
+        if (response.statusCode == 200) {
+          final respJson = jsonDecode(response.body);
+          if (respJson['success'] == true) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } else {
+          failCount++;
+        }
       }
+      setState(() {
+        _syncMessage = 'Sincronização concluída: $successCount enviados, $failCount falharam.';
+      });
     } catch (e) {
       setState(() {
         _syncMessage = 'Erro: $e';

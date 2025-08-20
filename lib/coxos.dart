@@ -30,6 +30,99 @@ class CoxosPage extends StatefulWidget {
 }
 
 class _CoxosPageState extends State<CoxosPage> {
+  bool _syncAvailable = false;
+  bool _syncing = false;
+  String? _syncMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCoxos();
+    _checkSyncAvailable();
+  }
+
+  Future<void> _checkSyncAvailable() async {
+    final hasInternet = await checkInternet();
+    final path = await _getFilePath();
+    final file = File(path);
+    bool hasChanges = false;
+    if (await file.exists()) {
+      final lastModified = await file.lastModified();
+      hasChanges = DateTime.now().difference(lastModified).inMinutes < 5;
+    }
+    setState(() {
+      _syncAvailable = hasInternet && hasChanges;
+    });
+  }
+
+  Future<void> _syncCoxos() async {
+    setState(() {
+      _syncing = true;
+      _syncMessage = null;
+    });
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final hostFile = File('${directory.path}/host.json');
+      String hostUrl = '';
+      if (await hostFile.exists()) {
+        final hostContent = await hostFile.readAsString();
+        final hostJson = jsonDecode(hostContent);
+        hostUrl = hostJson['host'] ?? '';
+      }
+      if (hostUrl.isEmpty) {
+        setState(() {
+          _syncMessage = 'Host não configurado.';
+        });
+        return;
+      }
+      final coxosFile = File('${directory.path}/coxos.json');
+      if (!await coxosFile.exists()) {
+        setState(() {
+          _syncMessage = 'Arquivo coxos.json não encontrado.';
+        });
+        return;
+      }
+      final coxosData = await coxosFile.readAsString();
+      final List<dynamic> coxosList = jsonDecode(coxosData);
+      final fullUrl = hostUrl.endsWith('/')
+        ? '${hostUrl}insert_manutencao.php'
+        : '$hostUrl/insert_manutencao.php';
+      int successCount = 0;
+      int failCount = 0;
+      for (var item in coxosList) {
+        final response = await http.post(
+          Uri.parse(fullUrl),
+          body: {
+            'coxo_idPost': item['coxo_id'] ?? '',
+            'data_manutPost': item['coxo_data'] ?? '',
+            'usuarioPost': item['usuario'] ?? '',
+          },
+        );
+        if (response.statusCode == 200) {
+          final respJson = jsonDecode(response.body);
+          if (respJson['success'] == true) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } else {
+          failCount++;
+        }
+      }
+      setState(() {
+        _syncMessage = 'Sincronização concluída: $successCount enviados, $failCount falharam.';
+      });
+    } catch (e) {
+      setState(() {
+        _syncMessage = 'Erro: $e';
+      });
+    } finally {
+      setState(() {
+        _syncing = false;
+      });
+      _checkSyncAvailable();
+    }
+  }
   List<Coxo> _coxos = [];
   bool _loading = true;
   bool _loadingHttp = false;
@@ -217,12 +310,6 @@ class _CoxosPageState extends State<CoxosPage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadCoxos();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -249,6 +336,27 @@ class _CoxosPageState extends State<CoxosPage> {
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Text(_httpMessage!, style: const TextStyle(color: Colors.green)),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.sync),
+              label: const Text('Sincronizar Dados'),
+              onPressed: _syncAvailable && !_syncing ? _syncCoxos : null,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          ),
+          if (_syncing)
+            const Padding(
+              padding: EdgeInsets.only(top: 8.0),
+              child: LinearProgressIndicator(),
+            ),
+          if (_syncMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(_syncMessage!, style: const TextStyle(color: Colors.green)),
             ),
           Expanded(
             child: _loading
