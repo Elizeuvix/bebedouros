@@ -307,8 +307,14 @@ class _CoxosPageState extends State<CoxosPage> {
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Informe a data';
+                    final regex = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$');
+                    if (!regex.hasMatch(v)) return 'Data inválida';
                     try {
-                      DateTime.parse(v);
+                      final partes = v.split('/');
+                      final dia = int.parse(partes[0]);
+                      final mes = int.parse(partes[1]);
+                      final ano = int.parse(partes[2]);
+                      DateTime(ano, mes, dia);
                       return null;
                     } catch (_) {
                       return 'Data inválida';
@@ -433,10 +439,16 @@ class _CoxosPageState extends State<CoxosPage> {
                       // Lógica para destacar o card em vermelho se a diferença entre coxo_data e hoje for <= 7 dias
                       Color? cardColor;
                       try {
-                        final dataCoxo = DateTime.parse(coxo.coxoData);
+                        // Aceita data no formato dd/MM/yyyy
+                        final partes = coxo.coxoData.split('/');
+                        final dataCoxo = DateTime(
+                          int.parse(partes[2]),
+                          int.parse(partes[1]),
+                          int.parse(partes[0]),
+                        );
                         final hoje = DateTime.now();
                         final diff = hoje.difference(dataCoxo).inDays;
-                        if (diff >= 0 && diff <= 7) {
+                        if (diff > 7) {
                           cardColor = Colors.red[200];
                         }
                       } catch (_) {
