@@ -16,19 +16,27 @@ class Coxo {
   factory Coxo.fromJson(Map<String, dynamic> json) {
     // Converte data do padrão americano para dd/MM/yyyy
     String coxoData = json['coxo_data'] ?? '';
+    String nextData = '';
     try {
       if (coxoData.isNotEmpty) {
-        final dt = DateTime.parse(coxoData);
+        // Aceita dd/MM/yyyy ou yyyy-MM-dd
+        DateTime dt;
+        if (coxoData.contains('/')) {
+          final partes = coxoData.split('/');
+          dt = DateTime(int.parse(partes[2]), int.parse(partes[1]), int.parse(partes[0]));
+        } else if (coxoData.contains('-')) {
+          final partes = coxoData.split('-');
+          dt = DateTime(int.parse(partes[0]), int.parse(partes[1]), int.parse(partes[2]));
+        } else {
+          dt = DateTime.parse(coxoData);
+        }
         coxoData = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+        final nextDt = dt.add(const Duration(days: 7));
+        nextData = '${nextDt.day.toString().padLeft(2, '0')}/${nextDt.month.toString().padLeft(2, '0')}/${nextDt.year}';
       }
-    } catch (_) {}
-    String nextData = json['next_data'] ?? '';
-    try {
-      if (nextData.isNotEmpty) {
-        final dt = DateTime.parse(nextData);
-        nextData = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-      }
-    } catch (_) {}
+    } catch (_) {
+      nextData = '';
+    }
     return Coxo(
       coxoId: json['coxo_id'] ?? '',
       coxoData: coxoData,
@@ -377,7 +385,7 @@ class _CoxosPageState extends State<CoxosPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Coxos', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Acompanhamento', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         elevation: 2,
@@ -480,7 +488,7 @@ class _CoxosPageState extends State<CoxosPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text('Data: ${coxo.coxoData}', style: const TextStyle(fontSize: 16)),
-                                Text('Próxima Data: ${coxo.nextData}', style: const TextStyle(fontSize: 16)),
+                                Text('Validade: ${coxo.nextData}', style: const TextStyle(fontSize: 16)),
                               ],
                             ),
                             trailing: IconButton(

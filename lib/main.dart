@@ -219,7 +219,7 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Identificação do Usuário', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Gestão de Bebedouros', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         elevation: 2,
