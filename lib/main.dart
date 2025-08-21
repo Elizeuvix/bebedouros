@@ -31,9 +31,32 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Identificação do Usuário',
+      title: 'Gestão de Bebedouros',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        useMaterial3: true,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
+          bodyMedium: TextStyle(fontSize: 16),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.indigo.shade50,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            backgroundColor: Colors.indigo,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(48),
+            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
       ),
       home: const UserIdentificationPage(),
     );
@@ -195,41 +218,55 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Identificação do Usuário')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Nome'),
+      appBar: AppBar(
+        title: const Text('Identificação do Usuário', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        elevation: 2,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Bem-vindo!', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _roleController,
+                  decoration: const InputDecoration(labelText: 'Função'),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.save),
+                  label: const Text('Salvar Usuário'),
+                  onPressed: _saveUserData,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.list_alt),
+                  label: const Text('Acompanhar Coxos'),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CoxosPage()),
+                    );
+                  },
+                ),
+                if (_message != null) ...[
+                  const SizedBox(height: 16),
+                  Text(_message!, style: const TextStyle(color: Colors.green)),
+                ],
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _roleController,
-              decoration: const InputDecoration(labelText: 'Função'),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _saveUserData,
-              child: const Text('Salvar'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CoxosPage()),
-                );
-              },
-              child: const Text('Abrir Coxos'),
-            ),
-            if (_message != null) ...[
-              const SizedBox(height: 16),
-              Text(_message!, style: const TextStyle(color: Colors.green)),
-            ],
-          ],
+          ),
         ),
       ),
       bottomNavigationBar: Padding(
@@ -245,39 +282,16 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
                   style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
                 ),
               ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.sync),
-              label: const Text('Sincronizar Dados'),
-              onPressed: _syncAvailable && !_syncing ? _syncCoxos : null,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
-            ),
-            if (_syncing)
-              const Padding(
-                padding: EdgeInsets.only(top: 8.0),
-                child: LinearProgressIndicator(),
-              ),
-            if (_syncMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  _syncMessage!,
-                  style: const TextStyle(color: Colors.green),
-                ),
-              ),
+                        
             ElevatedButton.icon(
               icon: const Icon(Icons.settings),
-              label: const Text('Configurações'),
+              label: const Text('Configurações (URL)'),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ConfigScreen()),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
             ),
           ],
         ),

@@ -377,7 +377,10 @@ class _CoxosPageState extends State<CoxosPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Coxos'),
+        title: const Text('Coxos', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        elevation: 2,
         actions: [
           FutureBuilder<bool>(
             future: checkInternet(),
@@ -385,7 +388,7 @@ class _CoxosPageState extends State<CoxosPage> {
               final isOnline = snapshot.data ?? false;
               return IconButton(
                 icon: const Icon(Icons.cloud_download),
-                tooltip: isOnline ? 'Load Coxos' : 'Sem conexão',
+                tooltip: isOnline ? 'Atualizar Coxos' : 'Sem conexão',
                 onPressed: (_loadingHttp || !isOnline)
                     ? null
                     : _loadCoxosFromWeb,
@@ -394,100 +397,111 @@ class _CoxosPageState extends State<CoxosPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (_loadingHttp) const LinearProgressIndicator(),
-          if (_httpMessage != null)
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.indigo.shade50, Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          children: [
+            if (_loadingHttp) const LinearProgressIndicator(),
+            if (_httpMessage != null)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  _httpMessage!,
+                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text(
-                _httpMessage!,
-                style: const TextStyle(color: Colors.green),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.sync),
+                label: const Text('Sincronizar Dados'),
+                onPressed: _syncAvailable && !_syncing ? _syncCoxos : null,
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.sync),
-              label: const Text('Sincronizar Dados'),
-              onPressed: _syncAvailable && !_syncing ? _syncCoxos : null,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
+            if (_syncing)
+              const Padding(
+                padding: EdgeInsets.only(top: 8.0),
+                child: LinearProgressIndicator(),
               ),
-            ),
-          ),
-          if (_syncing)
-            const Padding(
-              padding: EdgeInsets.only(top: 8.0),
-              child: LinearProgressIndicator(),
-            ),
-          if (_syncMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text(
-                _syncMessage!,
-                style: const TextStyle(color: Colors.green),
+            if (_syncMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  _syncMessage!,
+                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _coxos.isEmpty
-                ? const Center(child: Text('Nenhum registro encontrado.'))
-                : ListView.builder(
-                    itemCount: _coxos.length,
-                    itemBuilder: (context, index) {
-                      final coxo = _coxos[index];
-                      // Lógica para destacar o card em vermelho se a diferença entre coxo_data e hoje for <= 7 dias
-                      Color? cardColor;
-                      try {
-                        // Aceita data no formato dd/MM/yyyy
-                        final partes = coxo.coxoData.split('/');
-                        final dataCoxo = DateTime(
-                          int.parse(partes[2]),
-                          int.parse(partes[1]),
-                          int.parse(partes[0]),
-                        );
-                        final hoje = DateTime.now();
-                        final diff = hoje.difference(dataCoxo).inDays;
-                        if (diff > 7) {
-                          cardColor = Colors.red[200];
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _coxos.isEmpty
+                  ? const Center(child: Text('Nenhum registro encontrado.', style: TextStyle(fontSize: 18)))
+                  : ListView.builder(
+                      itemCount: _coxos.length,
+                      itemBuilder: (context, index) {
+                        final coxo = _coxos[index];
+                        Color? cardColor;
+                        try {
+                          final partes = coxo.coxoData.split('/');
+                          final dataCoxo = DateTime(
+                            int.parse(partes[2]),
+                            int.parse(partes[1]),
+                            int.parse(partes[0]),
+                          );
+                          final hoje = DateTime.now();
+                          final diff = hoje.difference(dataCoxo).inDays;
+                          if (diff > 7) {
+                            cardColor = Colors.red[100];
+                          } else {
+                            cardColor = Colors.white;
+                          }
+                        } catch (_) {
+                          cardColor = Colors.white;
                         }
-                      } catch (_) {
-                        cardColor = null;
-                      }
-                      return Card(
-                        color: cardColor,
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: ListTile(
-                          title: Text('ID: ${coxo.coxoId}'),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Data: ${coxo.coxoData}'),
-                              Text('Próxima Data: ${coxo.nextData}'),
-                            ],
+                        return Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit),
-                            tooltip: 'Editar',
-                            onPressed: () =>
-                                _addOrEditCoxo(coxo: coxo, index: index),
+                          color: cardColor,
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                          child: ListTile(
+                            title: Text('ID: ${coxo.coxoId}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Data: ${coxo.coxoData}', style: const TextStyle(fontSize: 16)),
+                                Text('Próxima Data: ${coxo.nextData}', style: const TextStyle(fontSize: 16)),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.indigo),
+                              tooltip: 'Editar',
+                              onPressed: () => _addOrEditCoxo(coxo: coxo, index: index),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addOrEditCoxo(),
-        child: const Icon(Icons.add),
+        backgroundColor: Colors.indigo,
+        child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Adicionar Coxo',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
