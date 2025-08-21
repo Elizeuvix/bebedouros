@@ -334,23 +334,25 @@ class _CoxosPageState extends State<CoxosPage> {
                 if (formKey.currentState?.validate() ?? false) {
                   final coxoId = idController.text.trim();
                   final coxoDataStr = dataController.text.trim();
-                  // Converte para padrão americano antes de salvar
+                  // Salva e exibe sempre em dd/MM/yyyy
                   DateTime coxoData;
                   try {
-                    coxoData = DateTime.parse(
-                      coxoDataStr.split('/').reversed.join('-'),
+                    final partes = coxoDataStr.split('/');
+                    coxoData = DateTime(
+                      int.parse(partes[2]),
+                      int.parse(partes[1]),
+                      int.parse(partes[0]),
                     );
                   } catch (_) {
                     coxoData = DateTime.now();
                   }
                   final nextData = coxoData
-                      .add(const Duration(days: 7))
-                      .toIso8601String()
-                      .split('T')[0];
+                      .add(const Duration(days: 7));
+                  final nextDataStr = '${nextData.day.toString().padLeft(2, '0')}/${nextData.month.toString().padLeft(2, '0')}/${nextData.year}';
                   final newCoxo = Coxo(
                     coxoId: coxoId,
-                    coxoData: '${coxoData.year}-${coxoData.month.toString().padLeft(2, '0')}-${coxoData.day.toString().padLeft(2, '0')}',
-                    nextData: nextData,
+                    coxoData: coxoDataStr,
+                    nextData: nextDataStr,
                   );
                   setState(() {
                     if (index != null) {

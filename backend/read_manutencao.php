@@ -38,7 +38,7 @@
         }
 
         // Monta a query dinamicamente conforme os filtros recebidos
-        $query = "SELECT id, coxo_id, data_manut FROM tb_coxos WHERE 1=1";
+    $query = "SELECT coxo_id, data_manut, usuario FROM tb_coxos WHERE 1=1";
         $params = [];
         $types = "";
 
