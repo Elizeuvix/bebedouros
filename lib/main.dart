@@ -19,7 +19,7 @@ Future<void> _ensureHostFile() async {
   final hostFile = File('${directory.path}/host.json');
   if (!await hostFile.exists()) {
     await hostFile.writeAsString(
-      jsonEncode({'host': 'http://192.168.3.196/coxos/'}),
+      jsonEncode({'host_url': 'http://192.168.3.196/coxos/'}),
     );
   }
 }
@@ -210,6 +210,22 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
     final path = await _getFilePath();
     final file = File(path);
     await file.writeAsString(data);
+
+    // Verifica e cria coxos.json se necessário
+    final dir = await getApplicationDocumentsDirectory();
+    final coxosFile = File('${dir.path}/coxos.json');
+    if (!await coxosFile.exists()) {
+      final now = DateTime.now();
+      final dataAtual = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+      final coxosData = [
+        {
+          'coxo_id': 'Teste',
+          'coxo_data': dataAtual,
+        }
+      ];
+      await coxosFile.writeAsString(jsonEncode(coxosData));
+    }
+
     setState(() {
       _message = 'Dados salvos com sucesso!';
     });

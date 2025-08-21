@@ -53,8 +53,6 @@ class CoxosPage extends StatefulWidget {
 }
 
 class _CoxosPageState extends State<CoxosPage> {
-  String? _lastSyncUrl;
-  bool _syncAvailable = false;
   bool _syncing = false;
   String? _syncMessage;
 
@@ -68,14 +66,11 @@ class _CoxosPageState extends State<CoxosPage> {
   Future<void> _checkSyncAvailable() async {
     final hasInternet = await checkInternet();
     setState(() {
-      _syncAvailable = hasInternet;
     });
   }
 
   Future<void> _syncCoxos() async {
-    // ...existing code...
     final directory = await getApplicationDocumentsDirectory();
-    // Lê nome do usuário salvo em user.json
     String usuarioNome = '';
     final userFile = File('${directory.path}/user.json');
     if (await userFile.exists()) {
@@ -133,7 +128,6 @@ class _CoxosPageState extends State<CoxosPage> {
         if (response.statusCode == 200) {
           final respJson = jsonDecode(response.body);
           setState(() {
-            _lastSyncUrl = fullUrl;
           });
           if (respJson['success'] == true) {
             successCount++;
@@ -390,17 +384,27 @@ class _CoxosPageState extends State<CoxosPage> {
         foregroundColor: Colors.white,
         elevation: 2,
         actions: [
-          FutureBuilder<bool>(
-            future: checkInternet(),
-            builder: (context, snapshot) {
-              final isOnline = snapshot.data ?? false;
-              return IconButton(
-                icon: const Icon(Icons.cloud_download),
-                tooltip: isOnline ? 'Atualizar Coxos' : 'Sem conexão',
-                onPressed: (_loadingHttp || !isOnline)
-                    ? null
-                    : _loadCoxosFromWeb,
-              );
+          IconButton(
+            icon: const Icon(Icons.cloud_download),
+            tooltip: 'Atualizar Coxos',
+            onPressed: _loadingHttp ? null : () async {
+              try {
+                await _loadCoxosFromWeb();
+              } catch (e) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Erro de conexão'),
+                    content: const Text('Não foi possível atualizar os coxos. Verifique sua conexão com a internet.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              }
             },
           ),
         ],
@@ -429,7 +433,25 @@ class _CoxosPageState extends State<CoxosPage> {
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.sync),
                 label: const Text('Sincronizar Dados'),
-                onPressed: _syncAvailable && !_syncing ? _syncCoxos : null,
+                onPressed: () async {
+                  try {
+                    await _syncCoxos();
+                  } catch (e) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Erro de conexão'),
+                        content: const Text('Não foi possível sincronizar os dados. Verifique sua conexão com a internet.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
               ),
             ),
             if (_syncing)
