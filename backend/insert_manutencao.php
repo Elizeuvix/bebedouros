@@ -43,29 +43,18 @@
             exit;
         }
 
-        if ($id) {
-            // UPDATE
-            $stmt = $conn->prepare("UPDATE tb_coxos SET coxo_id = ?, data_manut = ?, usuario = ? WHERE id = ?");
-            if ($stmt === false) {
-                $response["message"] = "Erro na preparação da consulta: " . $conn->error;
-                echo json_encode($response);
-                exit;
-            }
-            $stmt->bind_param("sssi", $coxo_id, $data_manut, $usuario, $id);
-        } else {
-            // INSERT
-            $stmt = $conn->prepare("INSERT INTO tb_coxos (coxo_id, data_manut, usuario) VALUES (?, ?, ?)");
-            if ($stmt === false) {
-                $response["message"] = "Erro na preparação da consulta: " . $conn->error;
-                echo json_encode($response);
-                exit;
-            }
-            $stmt->bind_param("sss", $coxo_id, $data_manut, $usuario);
+        // Apenas INSERT
+        $stmt = $conn->prepare("INSERT INTO tb_coxos (coxo_id, data_manut, usuario) VALUES (?, ?, ?)");
+        if ($stmt === false) {
+            $response["message"] = "Erro na preparação da consulta: " . $conn->error;
+            echo json_encode($response);
+            exit;
         }
+        $stmt->bind_param("sss", $coxo_id, $data_manut, $usuario);
 
         if ($stmt->execute()) {
             $response["success"] = true;
-            $response["message"] = $id ? "Manutenção atualizada com sucesso!" : "Manutenção registrada com sucesso!";
+            $response["message"] = "Manutenção registrada com sucesso!";
         } else {
             $response["message"] = "Erro ao registrar: " . $stmt->error;
         }
