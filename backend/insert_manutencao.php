@@ -43,8 +43,11 @@
             exit;
         }
 
-        // Apenas INSERT
-        $stmt = $conn->prepare("INSERT INTO tb_coxos (coxo_id, data_manut, usuario) VALUES (?, ?, ?)");
+        // UPSERT: insere ou atualiza se já existir
+        $stmt = $conn->prepare(
+            "INSERT INTO tb_coxos (coxo_id, data_manut, usuario) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE data_manut = VALUES(data_manut), usuario = VALUES(usuario)"
+        );
         if ($stmt === false) {
             $response["message"] = "Erro na preparação da consulta: " . $conn->error;
             echo json_encode($response);
@@ -54,9 +57,9 @@
 
         if ($stmt->execute()) {
             $response["success"] = true;
-            $response["message"] = "Manutenção registrada com sucesso!";
+            $response["message"] = "Manutenção registrada/atualizada com sucesso!";
         } else {
-            $response["message"] = "Erro ao registrar: " . $stmt->error;
+            $response["message"] = "Erro ao registrar/atualizar: " . $stmt->error;
         }
 
         echo json_encode($response);
