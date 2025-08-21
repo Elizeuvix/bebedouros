@@ -14,10 +14,25 @@ class Coxo {
   Coxo({required this.coxoId, required this.coxoData, required this.nextData});
 
   factory Coxo.fromJson(Map<String, dynamic> json) {
+    // Converte data do padrão americano para dd/MM/yyyy
+    String coxoData = json['coxo_data'] ?? '';
+    try {
+      if (coxoData.isNotEmpty) {
+        final dt = DateTime.parse(coxoData);
+        coxoData = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+      }
+    } catch (_) {}
+    String nextData = json['next_data'] ?? '';
+    try {
+      if (nextData.isNotEmpty) {
+        final dt = DateTime.parse(nextData);
+        nextData = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+      }
+    } catch (_) {}
     return Coxo(
       coxoId: json['coxo_id'] ?? '',
-      coxoData: json['coxo_data'] ?? '',
-      nextData: json['next_data'] ?? '',
+      coxoData: coxoData,
+      nextData: nextData,
     );
   }
 }
@@ -217,7 +232,8 @@ class _CoxosPageState extends State<CoxosPage> {
           : '$hostUrl/read_manutencao.php';
       final response = await http.get(Uri.parse(fullUrl));
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final Map<String, dynamic> respJson = jsonDecode(response.body);
+        final List<dynamic> jsonList = respJson['data'] ?? [];
         final List<Map<String, dynamic>> coxosToSave = [];
         for (var item in jsonList) {
           final coxoId = item['coxo_id'] ?? '';
@@ -265,8 +281,8 @@ class _CoxosPageState extends State<CoxosPage> {
   }
 
   Future<void> _addOrEditCoxo({Coxo? coxo, int? index}) async {
-    final idController = TextEditingController(text: coxo?.coxoId ?? '');
-    final dataController = TextEditingController(text: coxo?.coxoData ?? '');
+  final idController = TextEditingController(text: coxo?.coxoId ?? '');
+  final dataController = TextEditingController(text: coxo?.coxoData ?? '');
     final formKey = GlobalKey<FormState>();
     await showDialog(
       context: context,
@@ -311,14 +327,23 @@ class _CoxosPageState extends State<CoxosPage> {
               onPressed: () async {
                 if (formKey.currentState?.validate() ?? false) {
                   final coxoId = idController.text.trim();
-                  final coxoData = dataController.text.trim();
-                  final nextData = DateTime.parse(coxoData)
+                  final coxoDataStr = dataController.text.trim();
+                  // Converte para padrão americano antes de salvar
+                  DateTime coxoData;
+                  try {
+                    coxoData = DateTime.parse(
+                      coxoDataStr.split('/').reversed.join('-'),
+                    );
+                  } catch (_) {
+                    coxoData = DateTime.now();
+                  }
+                  final nextData = coxoData
                       .add(const Duration(days: 7))
                       .toIso8601String()
                       .split('T')[0];
                   final newCoxo = Coxo(
                     coxoId: coxoId,
-                    coxoData: coxoData,
+                    coxoData: '${coxoData.year}-${coxoData.month.toString().padLeft(2, '0')}-${coxoData.day.toString().padLeft(2, '0')}',
                     nextData: nextData,
                   );
                   setState(() {
@@ -405,7 +430,20 @@ class _CoxosPageState extends State<CoxosPage> {
                     itemCount: _coxos.length,
                     itemBuilder: (context, index) {
                       final coxo = _coxos[index];
+                      // Lógica para destacar o card em vermelho se a diferença entre coxo_data e hoje for <= 7 dias
+                      Color? cardColor;
+                      try {
+                        final dataCoxo = DateTime.parse(coxo.coxoData);
+                        final hoje = DateTime.now();
+                        final diff = hoje.difference(dataCoxo).inDays;
+                        if (diff >= 0 && diff <= 7) {
+                          cardColor = Colors.red[200];
+                        }
+                      } catch (_) {
+                        cardColor = null;
+                      }
                       return Card(
+                        color: cardColor,
                         margin: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
