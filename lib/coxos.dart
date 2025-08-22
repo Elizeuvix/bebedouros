@@ -122,7 +122,8 @@ class _CoxosPageState extends State<CoxosPage> {
           body: {
             'coxo_idPost': item['coxo_id'] ?? '',
             'data_manutPost': item['coxo_data'] ?? '',
-            'usuarioPost': usuarioNome,
+            'usuarioPost': item['coxo_usuario'] ?? usuarioNome, //nova linha
+            //'usuarioPost': usuarioNome,
           },
         );
         if (response.statusCode == 200) {
@@ -195,6 +196,7 @@ class _CoxosPageState extends State<CoxosPage> {
             'coxo_id': c.coxoId,
             'coxo_data': c.coxoData,
             'next_data': c.nextData,
+            'coxo_usuario': c.coxoUsuario, //nova linha
           },
         )
         .toList();
@@ -220,7 +222,7 @@ class _CoxosPageState extends State<CoxosPage> {
         setState(() {
           _httpMessage = 'Host não configurado.';
         });
-        // Abre a tela de configuração
+        // Abre a tela de configuração da URL
         Future.delayed(Duration.zero, () {
           Navigator.push(
             context,
@@ -240,6 +242,7 @@ class _CoxosPageState extends State<CoxosPage> {
         for (var item in jsonList) {
           final coxoId = item['coxo_id'] ?? '';
           final coxoData = item['data_manut'] ?? '';
+          final coxoUsuario = item['usuario'] ?? ''; //nova linha
           DateTime? data;
           try {
             data = DateTime.parse(coxoData);
@@ -257,6 +260,7 @@ class _CoxosPageState extends State<CoxosPage> {
             'coxo_id': coxoId,
             'coxo_data': coxoData,
             'next_data': nextData,
+            'coxo_usuario': coxoUsuario, //nova linha
           });
         }
         final path = await _getFilePath();
@@ -285,7 +289,17 @@ class _CoxosPageState extends State<CoxosPage> {
   Future<void> _addOrEditCoxo({Coxo? coxo, int? index}) async {
   final idController = TextEditingController(text: coxo?.coxoId ?? '');
   final dataController = TextEditingController(text: coxo?.coxoData ?? '');
-    final formKey = GlobalKey<FormState>();
+  final formKey = GlobalKey<FormState>();
+
+  final directory = await getApplicationDocumentsDirectory(); //nova linha
+  String usuarioNome = '';//nova linha
+  final userFile = File('${directory.path}/user.json');//nova linha
+  if (await userFile.exists()) {//nova linha
+    final userContent = await userFile.readAsString();//nova linha
+    final userJson = jsonDecode(userContent);//nova linha
+    usuarioNome = userJson['nome'] ?? '';//nova linha
+  } //nova linha
+
     await showDialog(
       context: context,
       builder: (dialogContext) {
@@ -355,6 +369,7 @@ class _CoxosPageState extends State<CoxosPage> {
                     coxoId: coxoId,
                     coxoData: coxoDataStr,
                     nextData: nextDataStr,
+                    coxoUsuario: usuarioNome, //nova linha
                   );
                   setState(() {
                     if (index != null) {
@@ -513,6 +528,28 @@ class _CoxosPageState extends State<CoxosPage> {
                                 Text('Validade: ${coxo.nextData}', style: const TextStyle(fontSize: 16)),
                               ],
                             ),
+                        
+                            //nova linha novo controle
+                            trailing: IconButton(
+                              icon: const Icon(Icons.today, color: Colors.green),
+                              tooltip: 'Data de Hoje',
+                              onPressed: () async {
+                                final hoje = DateTime.now();
+                                final dataAtualStr = '${hoje.day.toString().padLeft(2, '0')}/${hoje.month.toString().padLeft(2, '0')}/${hoje.year}';
+                                final nextData = hoje.add(const Duration(days: 7));
+                                final nextDataStr = '${nextData.day.toString().padLeft(2, '0')}/${nextData.month.toString().padLeft(2, '0')}/${nextData.year}';
+                                setState(() {
+                                  _coxos[index] = Coxo(
+                                    coxoId: coxo.coxoId,
+                                    coxoData: dataAtualStr,
+                                    nextData: nextDataStr,
+                                    coxoUsuario: usuarioNome,
+                                  );
+                                });
+                                await _saveCoxos();
+                              },
+                            ), //nova linha final novo controle
+                            
                             trailing: IconButton(
                               icon: const Icon(Icons.edit, color: Colors.indigo),
                               tooltip: 'Editar',
