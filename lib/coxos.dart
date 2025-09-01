@@ -411,20 +411,30 @@ class _CoxosPageState extends State<CoxosPage> {
   String dataAtual = '';
   final hoje = DateTime.now();
   dataAtual = '${hoje.day.toString().padLeft(2, '0')}/${hoje.month.toString().padLeft(2, '0')}/${hoje.year}';
-  final dataController = TextEditingController(text: coxo?.coxoData ?? dataAtual);
+  // Sempre preencher a data com a data atual ao abrir para novo/editar
+  final dataController = TextEditingController(text: dataAtual);
     await _loadRetirosList();
-    String initialRetiro = coxo?.retiro ?? _selectedRetiro;
+    String initialRetiro = (coxo?.retiro ?? _selectedRetiro).trim();
     if (initialRetiro.isEmpty) {
-      initialRetiro = await _loadRetiroSelecionado();
+      initialRetiro = (await _loadRetiroSelecionado()).trim();
     }
-    // Garante que o valor atual apareça selecionado no dropdown
-    List<String> retOptions = List<String>.from(_retiros);
+    // Opções do dropdown (itens aparados e não vazios)
+    List<String> retOptions = _retiros.map((r) => r.trim()).where((r) => r.isNotEmpty).toSet().toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    // Seleção inicial deve ser exatamente um item de retOptions; se não houver, insere-o
+    String currentRetiro;
     if (initialRetiro.isNotEmpty) {
-      final exists = retOptions.any((r) => _normalize(r) == _normalize(initialRetiro));
-      if (!exists) retOptions.insert(0, initialRetiro);
+      final idx = retOptions.indexWhere((r) => _normalize(r) == _normalize(initialRetiro));
+      if (idx >= 0) {
+        currentRetiro = retOptions[idx];
+      } else {
+        retOptions.insert(0, initialRetiro);
+        currentRetiro = initialRetiro;
+      }
+    } else {
+      currentRetiro = '';
     }
-    String currentRetiro = initialRetiro;
-    final localidadeController = TextEditingController(text: initialRetiro);
+    final localidadeController = TextEditingController(text: currentRetiro.isNotEmpty ? currentRetiro : initialRetiro);
     final formKey = GlobalKey<FormState>();
     await showDialog(
       context: context,
@@ -441,11 +451,14 @@ class _CoxosPageState extends State<CoxosPage> {
                     // Localidade (Retiro)
           if (retOptions.isNotEmpty)
                       DropdownButtonFormField<String>(
-            value: currentRetiro.isNotEmpty ? currentRetiro : null,
+                        value: currentRetiro.isNotEmpty ? currentRetiro : null,
             items: retOptions
                             .map((r) => DropdownMenuItem<String>(value: r, child: Text(r)))
                             .toList(),
-                        onChanged: (val) => setStateSB(() { currentRetiro = val ?? ''; }),
+                        onChanged: (val) => setStateSB(() {
+                          currentRetiro = val?.trim() ?? '';
+                          localidadeController.text = currentRetiro;
+                        }),
                         decoration: const InputDecoration(labelText: 'Localidade'),
                         validator: (v) => (v == null || v.isEmpty) ? 'Selecione a localidade' : null,
                       )
@@ -551,6 +564,8 @@ class _CoxosPageState extends State<CoxosPage> {
                     });
                     await historicoFile.writeAsString(jsonEncode(historicoList));
                   await _saveCoxos();
+                  // Recarrega a lista aplicando o filtro de localidade atual
+                  await _loadCoxos();
                   Navigator.pop(dialogContext);
                 }
               },
