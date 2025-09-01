@@ -268,7 +268,7 @@ class _UserIdentificationPageState extends State<UserIdentificationPage> {
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.list_alt),
-                  label: const Text('Acompanhar Coxos'),
+                  label: const Text('Acompanhar Bebedouros'),
                   onPressed: () {
                     Navigator.push(
                       context,

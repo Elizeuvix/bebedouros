@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'storage_service.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({Key? key}) : super(key: key);
@@ -56,6 +60,59 @@ class _ConfigScreenState extends State<ConfigScreen> {
     }
   }
 
+  Future<void> _fetchAndSaveRetiros() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Baixando retiros...';
+    });
+    try {
+      final baseUrl = await _storageService.loadUrl();
+      if (baseUrl == null || baseUrl.trim().isEmpty) {
+        setState(() {
+          _statusMessage = 'Host não configurado. Salve a URL primeiro.';
+        });
+        return;
+      }
+
+      final fullUrl = baseUrl.endsWith('/')
+          ? '${baseUrl}read_retiros.php'
+          : '$baseUrl/read_retiros.php';
+
+      final resp = await http.get(Uri.parse(fullUrl));
+      if (resp.statusCode != 200) {
+        setState(() {
+          _statusMessage = 'Falha ao baixar (HTTP ${resp.statusCode}).';
+        });
+        return;
+      }
+
+      // Tenta interpretar como JSON; se falhar, salva bruto mesmo
+      String toWrite;
+      try {
+        final decoded = jsonDecode(resp.body);
+        toWrite = const JsonEncoder.withIndent('  ').convert(decoded);
+      } catch (_) {
+        toWrite = resp.body;
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/retiros.json');
+      await file.writeAsString(toWrite);
+
+      setState(() {
+        _statusMessage = 'Retiros salvos em: ${file.path}';
+      });
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Erro ao baixar/salvar retiros: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,6 +135,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Salvar'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _fetchAndSaveRetiros,
+              icon: const Icon(Icons.cloud_download),
+              label: const Text('Baixar Retiros'),
             ),
             const SizedBox(height: 16),
             Text(_statusMessage, style: const TextStyle(color: Colors.green)),
